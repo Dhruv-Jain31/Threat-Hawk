@@ -1,0 +1,48 @@
+// Prisma schema for Threat Hawk App
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               Int       @id @default(autoincrement())
+  username         String    @unique
+  name             String
+  email            String    @unique
+  passwordHash     String?   // Optional if using OAuth
+  oauthProvider    String?   // e.g., "google", "github"
+  providerAccountId String? // OAuth provider's user ID
+  createdAt        DateTime  @default(now())
+  scans            Scan[]    // 1-to-many relationship with Scan
+}
+
+model Scan {
+  id          Int        @id @default(autoincrement())
+  type        ScanType
+  target      String
+  status      ScanStatus @default(PENDING)
+  resultHtml  String?    // Store only important scraped HTML
+  reportPath  String?    // Path to locally stored PDF/HTML report
+  createdAt   DateTime   @default(now())
+
+  // Relation to User
+  user        User       @relation(fields: [userId], references: [id])
+  userId      Int
+}
+
+enum ScanType {
+  WEB
+  NETWORK
+}
+
+enum ScanStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  FAILED
+}
