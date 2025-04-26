@@ -76,3 +76,5 @@ export default function Signup() {
         </div>
     );
 }
+
+//C:\Users\reall\OneDrive\Desktop\Projexts\Threat Hawk VDS\frontend\src\app\api\auth\signup\page.tsx
