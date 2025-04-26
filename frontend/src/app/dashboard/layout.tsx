@@ -17,25 +17,24 @@ const DashboardLayout = ({ children }: any) => {
   ];
 
   return (
-    <div className="flex h-screen text-gray-200">
-      {/* Sidebar */}
-      <aside className="w-44 bg-gray-900 p-6 border-r border-gray-800">
-        <h2 className="text-2xl font-bold text-white mb-8 "> <center>Scanner Dashboard</center></h2>
+    <div className="flex h-screen text-gray-200 flex-col md:flex-row">
+      {/* Sidebar for smaller screens will be at top */}
+      <aside className="w-full md:w-44 bg-gray-900 p-6 border-b md:border-r border-gray-800">
+        <h2 className="text-2xl font-bold text-white mb-8 text-center">Scanner Dashboard</h2>
         <nav>
-          <ul className="space-y-6">
+          <ul className="space-y-6 flex justify-around md:flex-col">
             {navItems.map(({ href, label, icon: Icon }, index) => (
-             <li key={index}>
-             <Link
-               href={href}
-               className={`flex flex-col items-center text-lg gap-1 px-2 py-2 rounded transition duration-200 hover:text-indigo-300 ${
-                 pathname === href ? "text-indigo-300 font-semibold" : "text-gray-300"
-               }`}
-             >
-               <Icon className="w-5 h-5" />
-               <span>{label}</span>
-             </Link>
-           </li>
-           
+              <li key={index}>
+                <Link
+                  href={href}
+                  className={`flex flex-col items-center text-lg gap-1 px-2 py-2 rounded transition duration-200 hover:text-indigo-300 ${
+                    pathname === href ? "text-indigo-300 font-semibold" : "text-gray-300"
+                  }`}
+                >
+                  <Icon className="w-5 h-5" />
+                  <span>{label}</span>
+                </Link>
+              </li>
             ))}
           </ul>
         </nav>
