@@ -26,7 +26,7 @@ model Scan {
   type        ScanType
   target      String
   status      ScanStatus @default(PENDING)
-  resultHtml  String?    // Store only important scraped HTML
+  resultHtml  String?    // Store only important scraped json
   reportPath  String?    // Path to locally stored PDF/HTML report
   createdAt   DateTime   @default(now())
 
