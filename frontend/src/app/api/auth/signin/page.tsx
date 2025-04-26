@@ -23,7 +23,7 @@ export default function SignIn() {
     };
 
     return (
-        <div style={{ maxWidth: '400px', margin: '50px auto', padding: '20px' }}>
+        <div className={"bg-amber-400"}>
             <h1>Sign In</h1>
             <form onSubmit={handleSubmit}>
                 <div style={{ marginBottom: '15px' }}>
