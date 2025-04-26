@@ -6,32 +6,26 @@ import os
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-app.secret_key = 'nmap_report_parser_secret_key'  # For flash messages
+app.secret_key = 'nmap_report_parser_secret_key'
 app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB
 app.config['ALLOWED_EXTENSIONS'] = {'html'}
 
-# Create uploads folder if it doesn't exist
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-
 def allowed_file(filename):
-    return '.' in filename and \
-        filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
-
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
 
 def parse_nmap_report(html_content):
     """Parse the NMAP report HTML and extract key information."""
     soup = BeautifulSoup(html_content, 'html.parser')
 
-    # Extract basic information
     title = soup.find('h1').text.strip() if soup.find('h1') else "NMAP Scan Report"
 
-    # Extract generated date and scan type more reliably
+    # Extract generated date and scan type
     generated_date = ""
     scan_type = ""
 
-    # Find all paragraphs and check for the generated date and scan type
     paragraphs = soup.find_all('p')
     for p in paragraphs:
         p_text = p.text.strip()
@@ -40,20 +34,17 @@ def parse_nmap_report(html_content):
         elif 'Scan Type:' in p_text:
             scan_type = p_text.replace('Scan Type:', '').strip()
 
-    # Extract raw scan output
     pre_elem = soup.find('pre')
     if not pre_elem:
         return {"error": "Could not find scan output in the report"}
 
     raw_scan = pre_elem.text.strip()
 
-    # Extract scan timestamp from raw output if not found in HTML
     if not generated_date:
         time_match = re.search(r'Starting Nmap .* at (.+)', raw_scan)
         if time_match:
             generated_date = time_match.group(1)
 
-    # Parse the raw scan output to extract structured data
     scan_data = {}
 
     # Extract target IP address
@@ -114,14 +105,36 @@ def parse_nmap_report(html_content):
                 'address': address
             })
 
-    # If scan_type is still empty, set a default value
+    # Check for deep scan vulnerability table
+    vuln_table = soup.find('table', class_='vuln-table')
+    if vuln_table:
+        headers = [th.text.strip() for th in vuln_table.find_all('th')]
+        deep_vulnerabilities = []
+        for row in vuln_table.find_all('tr')[1:]:  # Skip header
+            cols = row.find_all('td')
+            if len(cols) >= 4:
+                port = cols[0].text.strip()
+                service = cols[1].text.strip()
+                cve = cols[2].text.strip()
+                cvss = cols[3].text.strip()
+
+                deep_vulnerabilities.append({
+                    'port': port,
+                    'service': service,
+                    'cve': cve,
+                    'cvss': cvss
+                })
+
+        if deep_vulnerabilities:
+            scan_data['deep_vulnerabilities'] = deep_vulnerabilities
+
+    # If scan_type is still empty
     if not scan_type:
         if "OS and Service detection performed" in raw_scan:
             scan_type = "OS and Service detection"
         else:
             scan_type = "Standard scan"
 
-    # Combine all the information
     report_data = {
         'title': title,
         'generated_date': generated_date,
@@ -132,7 +145,6 @@ def parse_nmap_report(html_content):
 
     return report_data
 
-
 def generate_summary(scan_data):
     """Generate a simple summary of the scan results."""
     summary = []
@@ -140,7 +152,11 @@ def generate_summary(scan_data):
     if 'target_ip' in scan_data:
         summary.append(f"Target IP: {scan_data['target_ip']}")
 
-    if 'ports' in scan_data:
+    if 'deep_vulnerabilities' in scan_data:
+        summary.append(f"Found {len(scan_data['deep_vulnerabilities'])} vulnerabilities:")
+        for vuln in scan_data['deep_vulnerabilities']:
+            summary.append(f"  - Port {vuln['port']} ({vuln['service']}): {vuln['cve']} (CVSS: {vuln['cvss']})")
+    elif 'ports' in scan_data:
         open_ports = [p for p in scan_data['ports'] if p['state'] == 'open']
         closed_ports = [p for p in scan_data['ports'] if p['state'] == 'closed']
         filtered_ports = [p for p in scan_data['ports'] if p['state'] == 'filtered']
@@ -163,39 +179,31 @@ def generate_summary(scan_data):
 
     return summary
 
-
 @app.route('/')
 def index():
     return render_template('index.html')
 
-
 @app.route('/upload', methods=['POST'])
 def upload_file():
-    # Check if a file was uploaded
     if 'file' not in request.files:
         flash('No file part')
         return redirect(request.url)
 
     file = request.files['file']
 
-    # If user doesn't select file, browser also
-    # submits an empty part without filename
     if file.filename == '':
         flash('No selected file')
         return redirect(request.url)
 
     if file and allowed_file(file.filename):
-        # Read the file content
         file_content = file.read().decode('utf-8')
 
-        # Parse the NMAP report
         report_data = parse_nmap_report(file_content)
 
         if 'error' in report_data:
             flash(report_data['error'])
             return redirect(request.url)
 
-        # Save the parsed report for display
         filename = secure_filename(file.filename)
         parsed_filename = os.path.splitext(filename)[0] + '_parsed.json'
         parsed_filepath = os.path.join(app.config['UPLOAD_FOLDER'], parsed_filename)
@@ -208,17 +216,14 @@ def upload_file():
     flash('Only HTML files are allowed')
     return redirect(request.url)
 
-
 @app.route('/raw_content', methods=['POST'])
 def parse_raw_content():
-    # Get the raw HTML content from the form
     raw_content = request.form.get('raw_content', '')
 
     if not raw_content:
         flash('No content provided')
         return redirect(url_for('index'))
 
-    # Parse the NMAP report
     report_data = parse_nmap_report(raw_content)
 
     if 'error' in report_data:
@@ -226,7 +231,6 @@ def parse_raw_content():
         return redirect(url_for('index'))
 
     return render_template('index.html', report=report_data)
-
 
 if __name__ == '__main__':
     app.run(debug=True)
