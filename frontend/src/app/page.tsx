@@ -28,7 +28,7 @@ export default function Home() {
             rel="noopener noreferrer"
           >
             <Image
-              className={styles.logo}
+              className={"font-serif text-2xl"}
               src="/vercel.svg"
               alt="Vercel logomark"
               width={20}
