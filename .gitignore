@@ -49,3 +49,7 @@ frontend/*.tsbuildinfo
 frontend/.vercelignore
 frontend/.next.config.local.js
 
+#python
+venv/
+__pycache__/
+*.py[cod]
