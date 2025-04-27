@@ -3,29 +3,31 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { FaHome, FaFolderOpen, FaPlusCircle } from "react-icons/fa"; // Importing React Icons
+import { TbReport } from "react-icons/tb";
 
 const DashboardLayout = ({ children }: any) => {
   const pathname = usePathname();
 
   // Define the navigation items
   const navItems = [
-    { label: "Home", href: "/", icon: FaHome },
-    { label: "New Scan", href: "/new-scan", icon: FaPlusCircle },
-    { label: "Your Scans", href: "/your-scans", icon: FaFolderOpen },
+    { label: "Home", href: "/dashboard", icon: FaHome },
+    { label: "New Scan", href: "/dashboard/newscan", icon: FaPlusCircle },
+    { label: "Your Scans", href: "/dashboard/yourscans", icon: FaFolderOpen },
+    { label: "Scan Reports", href: "/dashboard/reports", icon: TbReport },
   ];
 
   return (
-    <div className="flex h-screen text-gray-200">
-      {/* Sidebar */}
-      <aside className="w-64 bg-gray-900 p-6 border-r border-gray-800">
-        <h2 className="text-3xl font-bold text-white mb-8">Scanner Dashboard</h2>
+    <div className="flex h-screen text-gray-200 flex-col md:flex-row">
+      {/* Sidebar for smaller screens will be at top */}
+      <aside className="w-full md:w-44 bg-gray-900 p-6 border-b md:border-r border-gray-800">
+        <h2 className="text-2xl font-bold text-white mb-8 text-center">Scanner Dashboard</h2>
         <nav>
-          <ul className="space-y-6">
+          <ul className="space-y-6 flex justify-around md:flex-col">
             {navItems.map(({ href, label, icon: Icon }, index) => (
               <li key={index}>
                 <Link
                   href={href}
-                  className={`flex items-center text-lg gap-3 px-2 py-2 rounded transition duration-200 hover:text-indigo-300 ${
+                  className={`flex flex-col items-center text-lg gap-1 px-2 py-2 rounded transition duration-200 hover:text-indigo-300 ${
                     pathname === href ? "text-indigo-300 font-semibold" : "text-gray-300"
                   }`}
                 >
