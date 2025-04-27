@@ -1,11 +1,11 @@
 import subprocess
-from zapv2 import ZAPv2
 import os
 import time
 from urllib.parse import urlparse
 import re
 import requests
 import uuid
+from datetime import datetime
 
 # Mock mode for testing (set to False for real scans)
 MOCK_MODE = False
@@ -36,50 +36,16 @@ def extract_host(url):
     return hostname
 
 def start_zap_container(report_dir):
-    """Start a ZAP container and return the container ID and host port"""
-    zap_port = 8090  # Fixed port for now; consider dynamic port allocation for concurrency
-    container_name = f"zap_scan_{uuid.uuid4().hex[:8]}"
-    
-    # Ensure report_dir is absolute and normalized for Docker volume mounting on Windows
-    report_dir = os.path.abspath(report_dir).replace('\\', '/')
-    
-    cmd = [
-        'docker', 'run', '-d',
-        '-p', f'{zap_port}:8080',
-        '-v', f'{report_dir}:/zap/wrk:rw',
-        '--name', container_name,
-        'ghcr.io/zaproxy/zaproxy:stable',
-        'zap.sh', '-daemon', '-host', '0.0.0.0', '-port', '8080'
-    ]
-    
-    try:
-        container_id = subprocess.check_output(cmd, text=True).strip()
-        return container_id, zap_port, container_name
-    except subprocess.CalledProcessError as e:
-        raise Exception(f"Failed to start ZAP container: {e.output}")
+    """Start a ZAP container and return the container ID and host port (placeholder for CLI approach)"""
+    return str(uuid.uuid4()), 0, f"zap_scan_{uuid.uuid4().hex[:8]}"
 
 def stop_zap_container(container_id):
-    """Stop and remove the ZAP container"""
-    try:
-        subprocess.run(['docker', 'stop', container_id], capture_output=True, text=True, check=True)
-        subprocess.run(['docker', 'rm', container_id], capture_output=True, text=True, check=True)
-    except subprocess.CalledProcessError as e:
-        raise Exception(f"Failed to stop/remove ZAP container: {e.output}")
+    """Stop and remove the ZAP container (no-op for CLI approach)"""
+    pass
 
 def check_zap_api(zap_port):
-    """Check if ZAP API is accessible with retries"""
-    max_retries = 100  # Increased retries due to ZAP startup time
-    retry_delay = 10  # seconds
-    for attempt in range(max_retries):
-        try:
-            response = requests.get(f'http://127.0.0.1:{zap_port}', timeout=5)
-            if response.status_code == 200:
-                return True
-        except requests.RequestException:
-            if attempt == max_retries - 1:
-                raise Exception(f"ZAP API is not accessible at http://localhost:{zap_port} after {max_retries * retry_delay} seconds.")
-            time.sleep(retry_delay)
-    return False
+    """Check if ZAP API is accessible with retries (not used for CLI)"""
+    return True
 
 def run_nmap_scan(url, scan_type):
     """Run Nmap scan using instrumentisto/nmap Docker image"""
@@ -103,7 +69,7 @@ def run_nmap_scan(url, scan_type):
             cmd,
             capture_output=True,
             text=True,
-            timeout=300  # 5-minute timeout
+            timeout=300
         )
         return process.stdout
     except subprocess.TimeoutExpired:
@@ -112,6 +78,7 @@ def run_nmap_scan(url, scan_type):
         raise Exception(f"Nmap scan failed: {e.output}")
 
 def run_zap_scan(url, scan_type, report_dir):
+    """Run ZAP scan using zap-baseline.py or zap-full-scan.py"""
     print(f"Starting ZAP scan for {url} with type {scan_type}")
     if MOCK_MODE:
         mock_path = os.path.join(MOCK_REPORTS_DIR, 'zap_report.html')
@@ -123,49 +90,103 @@ def run_zap_scan(url, scan_type, report_dir):
     if not is_valid_url(url):
         raise ValueError("Invalid URL format")
 
-    container_id, zap_port, container_name = start_zap_container(report_dir)
-    print(f"Container started: {container_id}, port: {zap_port}")
-    
+    # Ensure report directory exists and is writable
+    os.makedirs(report_dir, exist_ok=True)
+    report_id = str(uuid.uuid4())
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    report_filename = f"{report_id}_{timestamp}_report.html"
+    report_path = os.path.join(report_dir, report_filename)
+
+    # Determine the ZAP script based on scan_type and set timeout
+    if scan_type == "zap_regular":
+        zap_script = "zap-baseline.py"
+        timeout_seconds = 1200  # 20 minutes for baseline scan
+    elif scan_type == "zap_deep":
+        zap_script = "zap-full-scan.py"
+        timeout_seconds = 3600  # 60 minutes for deep scan
+    else:
+        raise ValueError(f"Unsupported scan_type: {scan_type}. Use 'zap_regular' or 'zap_deep'.")
+
+    # Construct the Docker command with corrected report path
+    cmd = [
+        "docker", "run",
+        "--rm",
+        "--network=host",
+        "-v", f"{os.path.abspath(report_dir).replace('\\', '/')}:/zap/wrk:rw",
+        "ghcr.io/zaproxy/zaproxy:stable",
+        zap_script,
+        "-t", url,
+        "-r", f"{report_filename}"  # Use relative path inside /zap/wrk
+    ]
+
+    print(f"Running ZAP command: {' '.join(cmd)}")
     try:
-        print(f"Checking ZAP API on port {zap_port}")
-        if not check_zap_api(zap_port):
-            raise Exception(f"Failed to connect to ZAP API at http://127.0.0.1:{zap_port} after retries.")
-        print(f"ZAP API connected on port {zap_port}")
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        start_time = time.time()
+        stdout, stderr = "", ""
+        while True:
+            elapsed_time = time.time() - start_time
+            if elapsed_time > timeout_seconds:
+                process.terminate()
+                raise subprocess.TimeoutExpired(cmd, timeout_seconds, f"Scan timed out after {timeout_seconds} seconds")
+            
+            stdout_line = process.stdout.readline()
+            stderr_line = process.stderr.readline()
+            if stdout_line:
+                print(f"ZAP scan progress: {stdout_line.strip()}")
+                stdout += stdout_line
+            if stderr_line:
+                print(f"ZAP scan warning/error: {stderr_line.strip()}")
+                stderr += stderr_line
+            
+            if process.poll() is not None:
+                remaining_stdout, remaining_stderr = process.communicate()
+                stdout += remaining_stdout
+                stderr += remaining_stderr
+                break
 
-        zap = ZAPv2(proxies={'http': f'http://127.0.0.1:{zap_port}', 'https': f'http://127.0.0.1:{zap_port}'})
-        print(f"Initializing ZAP client with proxies: {zap.proxies}")
-        response = zap.core.version()  # Test API connection
-        print(f"ZAP version: {response}")
-        zap.urlopen(url)
-        print(f"URL opened: {url}")
-        time.sleep(2)
+        if process.returncode != 0 and process.returncode != 2:  # Allow exit code 2 if report exists
+            error_msg = f"Docker command failed with exit code {process.returncode}"
+            if stderr:
+                error_msg += f": {stderr}"
+            elif stdout:
+                error_msg += f": {stdout}"
+            else:
+                error_msg += ": No detailed error output"
+            raise Exception(error_msg)
 
-        spider_params = {'maxchildren': 10, 'recurse': True} if scan_type == 'zap_deep' else {}
-        scan_id = zap.spider.scan(url, **spider_params)
-        print(f"Spidering started, ID: {scan_id}")
-        while int(zap.spider.status(scan_id)) < 100:
-            print(f"Spider progress: {zap.spider.status(scan_id)}%")
-            time.sleep(5)
+        print(f"ZAP scan completed. Full stdout: {stdout}")
+        if stderr:
+            print(f"ZAP scan stderr: {stderr}")
 
-        active_scan_id = zap.ascan.scan(url)
-        print(f"Active scan started, ID: {active_scan_id}")
-        while int(zap.ascan.status(active_scan_id)) < 100:
-            print(f"Active scan progress: {zap.ascan.status(active_scan_id)}%")
-            time.sleep(5)
-
-        report = zap.core.htmlreport()
-        if not report:
-            raise Exception("Failed to generate ZAP report")
-        print(f"Report generated successfully, length: {len(report)} bytes")
-        return report
-
+    except subprocess.TimeoutExpired as e:
+        print(f"ZAP scan error: {str(e)}")
+        raise Exception(f"ZAP scan failed: {str(e)}")
     except Exception as e:
         print(f"ZAP scan error: {str(e)}")
-        import traceback
-        traceback.print_exc()  # Print full stack trace
-        raise
-    finally:
-        stop_zap_container(container_id)
+        raise Exception(f"ZAP scan failed: {str(e)}")
+
+    # Read the generated report
+    max_wait_time = 120  # 2 minutes for file to appear
+    wait_time = 0
+    while not os.path.exists(report_path) and wait_time < max_wait_time:
+        time.sleep(5)
+        wait_time += 5
+        print(f"Waiting for report at {report_path}... ({wait_time}s elapsed)")
+
+    if not os.path.exists(report_path):
+        raise Exception(f"Report file not found at {report_path} after {max_wait_time} seconds")
+    with open(report_path, 'r', encoding='utf-8') as f:
+        report = f.read()
+    if not report or '<html' not in report.lower():  # Basic HTML validation
+        raise Exception("ZAP report is empty or invalid")
+    print(f"Report generated successfully at {report_path}")
+    return report
 
 def run_scan(url, scan_type, report_dir=None):
     """Run the specified scan type"""
