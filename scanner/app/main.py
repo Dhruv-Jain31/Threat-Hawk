@@ -41,11 +41,11 @@ def scan():
         return jsonify({"error": f"Invalid scan_type. Supported types: {', '.join(VALID_SCAN_TYPES)}"}), 400
 
     try:
-        # Run the scan
-        report_content = run_scan(url, scan_type, report_dir=ZAP_REPORTS_DIR if 'zap' in scan_type else None)
+        # Run the scan with appropriate report directory for ZAP
+        report_content = run_scan(url, scan_type, report_dir=ZAP_REPORTS_DIR if 'zap' in scan_type else NMAP_REPORTS_DIR)
 
         # Generate report ID and paths
-        report_id = str(uuid.uuid4())
+        report_id = str(uuid.uuid4())  # Define report_id here
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         
         if 'nmap' in scan_type:
@@ -75,7 +75,7 @@ def scan():
         return jsonify({"error": f"Scan failed: {str(e)}"}), 500
 
 @app.route('/report/<report_id>', methods=['GET'])
-def get_report(report_id):
+def get_report(report_id):  # Add report_id as a parameter
     """Retrieve a scan report"""
     zap_report_path = os.path.join(ZAP_REPORTS_DIR, f"{report_id}_display.html")
     nmap_report_path = os.path.join(NMAP_REPORTS_DIR, f"{report_id}_display.xml")
@@ -86,6 +86,5 @@ def get_report(report_id):
         return send_file(nmap_report_path, mimetype='application/xml')
     else:
         return jsonify({"error": "Report not found"}), 404
-
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
