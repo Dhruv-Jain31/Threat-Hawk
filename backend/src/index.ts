@@ -10,6 +10,7 @@ app.use(express.json());
 
 // Mount auth routes
 app.use('/api/auth', authRouter);
+app.use('/api/scan', scanRouter);
 
 app.listen(5000, () => {
     console.log('Backend running on http://localhost:5000');
