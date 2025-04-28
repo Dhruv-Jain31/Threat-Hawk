@@ -5,7 +5,6 @@ import os
 import uuid
 import logging
 from datetime import datetime
-# Use absolute import for clarity when running directly
 from utils.scanner import run_scan, VALID_SCAN_TYPES
 
 app = Flask(__name__)
@@ -41,34 +40,31 @@ def scan():
         return jsonify({"error": f"Invalid scan_type. Supported types: {', '.join(VALID_SCAN_TYPES)}"}), 400
 
     try:
-        # Run the scan with appropriate report directory for ZAP
-        report_content = run_scan(url, scan_type, report_dir=ZAP_REPORTS_DIR if 'zap' in scan_type else NMAP_REPORTS_DIR)
-
-        # Generate report ID and paths
-        report_id = str(uuid.uuid4())  # Define report_id here
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        # Generate report ID upfront
+        report_id = str(uuid.uuid4())
         
+        # Define the report filename based on scan type
         if 'nmap' in scan_type:
-            report_path = os.path.join(NMAP_REPORTS_DIR, f"{report_id}.xml")
-            display_path = os.path.join(NMAP_REPORTS_DIR, f"{report_id}_display.xml")
-            with open(report_path, 'w', encoding='utf-8') as f:
-                f.write(report_content)
-            with open(display_path, 'w', encoding='utf-8') as f:
-                f.write(report_content)
+            report_filename = f"{report_id}.xml"
+            report_path = os.path.join(NMAP_REPORTS_DIR, report_filename)
         else:  # ZAP scan
-            report_path = os.path.join(ZAP_REPORTS_DIR, f"{report_id}.html")
-            display_path = os.path.join(ZAP_REPORTS_DIR, f"{report_id}_display.html")
+            report_filename = f"{report_id}.html"
+            report_path = os.path.join(ZAP_REPORTS_DIR, report_filename)
+
+        # Run the scan with the report path directly
+        report_content = run_scan(url, scan_type, report_dir=ZAP_REPORTS_DIR if 'zap' in scan_type else NMAP_REPORTS_DIR, report_filename=report_filename)
+
+        # Save the report content to a single file (already saved by run_scan for ZAP, but Nmap needs saving here)
+        if 'nmap' in scan_type:
             with open(report_path, 'w', encoding='utf-8') as f:
-                f.write(report_content)
-            with open(display_path, 'w', encoding='utf-8') as f:
                 f.write(report_content)
 
         logger.info(f"Scan completed for URL: {url}, Scan Type: {scan_type}, Report ID: {report_id}")
         return jsonify({
             "message": "Scan completed",
             "report_id": report_id,
-            "report_path": f"reports/{'zap' if 'zap' in scan_type else 'nmap'}/{report_id}{'.html' if 'zap' in scan_type else '.xml'}",
-            "scan_type": scan_type
+            "report_path": f"reports/{'zap' if 'zap' in scan_type else 'nmap'}/{report_filename}",
+            "scan_type": scan_type  # Added scan_type to the response
         }), 200
 
     except Exception as e:
@@ -76,10 +72,10 @@ def scan():
         return jsonify({"error": f"Scan failed: {str(e)}"}), 500
 
 @app.route('/report/<report_id>', methods=['GET'])
-def get_report(report_id):  # Add report_id as a parameter
+def get_report(report_id):
     """Retrieve a scan report"""
-    zap_report_path = os.path.join(ZAP_REPORTS_DIR, f"{report_id}_display.html")
-    nmap_report_path = os.path.join(NMAP_REPORTS_DIR, f"{report_id}_display.xml")
+    zap_report_path = os.path.join(ZAP_REPORTS_DIR, f"{report_id}.html")
+    nmap_report_path = os.path.join(NMAP_REPORTS_DIR, f"{report_id}.xml")
 
     if os.path.exists(zap_report_path):
         return send_file(zap_report_path, mimetype='text/html')
@@ -87,5 +83,6 @@ def get_report(report_id):  # Add report_id as a parameter
         return send_file(nmap_report_path, mimetype='application/xml')
     else:
         return jsonify({"error": "Report not found"}), 404
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

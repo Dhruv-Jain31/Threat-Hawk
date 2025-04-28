@@ -77,7 +77,7 @@ def run_nmap_scan(url, scan_type):
     except subprocess.CalledProcessError as e:
         raise Exception(f"Nmap scan failed: {e.output}")
 
-def run_zap_scan(url, scan_type, report_dir):
+def run_zap_scan(url, scan_type, report_dir, report_filename):
     """Run ZAP scan using zap-baseline.py or zap-full-scan.py"""
     print(f"Starting ZAP scan for {url} with type {scan_type}")
     if MOCK_MODE:
@@ -92,9 +92,6 @@ def run_zap_scan(url, scan_type, report_dir):
 
     # Ensure report directory exists and is writable
     os.makedirs(report_dir, exist_ok=True)
-    report_id = str(uuid.uuid4())
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    report_filename = f"{report_id}_{timestamp}_report.html"
     report_path = os.path.join(report_dir, report_filename)
 
     # Determine the ZAP script based on scan_type and set timeout
@@ -107,7 +104,7 @@ def run_zap_scan(url, scan_type, report_dir):
     else:
         raise ValueError(f"Unsupported scan_type: {scan_type}. Use 'zap_regular' or 'zap_deep'.")
 
-    # Construct the Docker command with corrected report path
+    # Construct the Docker command with the provided report filename
     cmd = [
         "docker", "run",
         "--rm",
@@ -116,7 +113,7 @@ def run_zap_scan(url, scan_type, report_dir):
         "ghcr.io/zaproxy/zaproxy:stable",
         zap_script,
         "-t", url,
-        "-r", f"{report_filename}"  # Use relative path inside /zap/wrk
+        "-r", f"{report_filename}"  # Use the provided filename directly
     ]
 
     print(f"Running ZAP command: {' '.join(cmd)}")
@@ -150,7 +147,7 @@ def run_zap_scan(url, scan_type, report_dir):
                 stderr += remaining_stderr
                 break
 
-        if process.returncode != 0 and process.returncode != 2:  # Allow exit code 2 if report exists
+        if process.returncode != 0 and process.returncode != 2:
             error_msg = f"Docker command failed with exit code {process.returncode}"
             if stderr:
                 error_msg += f": {stderr}"
@@ -183,12 +180,12 @@ def run_zap_scan(url, scan_type, report_dir):
         raise Exception(f"Report file not found at {report_path} after {max_wait_time} seconds")
     with open(report_path, 'r', encoding='utf-8') as f:
         report = f.read()
-    if not report or '<html' not in report.lower():  # Basic HTML validation
+    if not report or '<html' not in report.lower():
         raise Exception("ZAP report is empty or invalid")
     print(f"Report generated successfully at {report_path}")
     return report
 
-def run_scan(url, scan_type, report_dir=None):
+def run_scan(url, scan_type, report_dir=None, report_filename=None):
     """Run the specified scan type"""
     if scan_type not in VALID_SCAN_TYPES:
         raise ValueError(f"Invalid scan type: {scan_type}. Supported types: {', '.join(VALID_SCAN_TYPES)}")
@@ -199,6 +196,6 @@ def run_scan(url, scan_type, report_dir=None):
     if scan_type in ['nmap_regular', 'nmap_deep']:
         return run_nmap_scan(url, scan_type)
     elif scan_type in ['zap_regular', 'zap_deep']:
-        if not report_dir:
-            raise ValueError("report_dir is required for ZAP scans")
-        return run_zap_scan(url, scan_type, report_dir)
+        if not report_dir or not report_filename:
+            raise ValueError("report_dir and report_filename are required for ZAP scans")
+        return run_zap_scan(url, scan_type, report_dir, report_filename)
