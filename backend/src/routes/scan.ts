@@ -1,7 +1,7 @@
 import express, { Request, Response, RequestHandler } from 'express';
 import axios, { AxiosError } from 'axios';
-import { verify } from 'jsonwebtoken';
-import prisma from '../prisma/client';
+import prisma from '../client';
+import { authMiddleware, restrictTo } from '../middleware/auth';
 
 const router = express.Router();
 
@@ -10,6 +10,7 @@ interface ScanRequestBody {
   url: string;
   scan_type: 'zap_regular' | 'zap_deep' | 'nmap_regular' | 'nmap_deep';
   userId?: number; // Added by authMiddleware
+  role?: string; // Added by authMiddleware
 }
 
 // Type for Flask response (adjust based on your Flask server's response structure)
@@ -17,36 +18,6 @@ interface FlaskResponse {
   scan_result: any; // JSON output from scraper
   report_path?: string; // Path to report file
 }
-
-// Authentication middleware to verify JWT and extract userId
-const authMiddleware: RequestHandler = async (req: Request, res: Response, next: Function): Promise<void> => {
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    res.status(401).json({ error: 'Unauthorized: Missing or invalid Authorization header' });
-    return;
-  }
-
-  const token = authHeader.split(' ')[1];
-
-  try {
-    // Verify JWT token using NextAuth secret
-    const decoded = verify(token, process.env.NEXTAUTH_SECRET || 'secret') as { userId: string };
-    console.log('Decoded JWT:', decoded); // Log to confirm userId is present
-
-    if (!decoded.userId) {
-      res.status(401).json({ error: 'Unauthorized: Invalid token payload' });
-      return;
-    }
-
-    // Add userId to request body
-    req.body.userId = parseInt(decoded.userId, 10);
-    next();
-  } catch (error) {
-    console.error('JWT verification error:', error);
-    res.status(401).json({ error: 'Unauthorized: Invalid token' });
-  }
-};
 
 // Trigger a scan and save to database
 const scanHandler: RequestHandler = async (req: Request<{}, {}, ScanRequestBody>, res: Response): Promise<void> => {
@@ -139,6 +110,9 @@ const scanHandler: RequestHandler = async (req: Request<{}, {}, ScanRequestBody>
   }
 };
 
+// Apply authMiddleware to all scan routes
+// Example: Restrict zap_deep and nmap_deep to admins
 router.post('/', authMiddleware, scanHandler);
+// router.post('/', authMiddleware, restrictTo('admin'), scanHandler); // Uncomment for admin-only scans
 
 export default router;
