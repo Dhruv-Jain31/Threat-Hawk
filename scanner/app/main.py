@@ -67,7 +67,8 @@ def scan():
         return jsonify({
             "message": "Scan completed",
             "report_id": report_id,
-            "report_path": f"reports/{'zap' if 'zap' in scan_type else 'nmap'}/{report_id}{'.html' if 'zap' in scan_type else '.xml'}"
+            "report_path": f"reports/{'zap' if 'zap' in scan_type else 'nmap'}/{report_id}{'.html' if 'zap' in scan_type else '.xml'}",
+            "scan_type": scan_type
         }), 200
 
     except Exception as e:
