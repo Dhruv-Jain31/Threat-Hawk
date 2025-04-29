@@ -7,6 +7,7 @@ import requests
 import uuid
 from datetime import datetime
 import xml.etree.ElementTree as ET
+import xml.dom.minidom as minidom 
 
 # Mock mode for testing (set to False for real scans)
 MOCK_MODE = False
@@ -48,8 +49,9 @@ def check_zap_api(zap_port):
     """Check if ZAP API is accessible with retries (not used for CLI)"""
     return True
 
+'''
 def parse_nmap_txt_to_xml(txt_output, target_hostname):
-    """Convert Nmap .txt output to XML format"""
+    """Convert Nmap .txt output to XML format and pretty-print it"""
     root = ET.Element("nmap_scan")
     host = ET.SubElement(root, "host")
     
@@ -112,7 +114,14 @@ def parse_nmap_txt_to_xml(txt_output, target_hostname):
         if current_port and vulnerabilities:
             current_port.append(vulnerabilities)
 
-    return ET.tostring(root, encoding='unicode')
+    # Convert the XML tree to a string
+    xml_string = ET.tostring(root, encoding='unicode')
+
+    # Pretty-print the XML
+    dom = minidom.parseString(xml_string)
+    pretty_xml = dom.toprettyxml(indent="  ")
+
+    return pretty_xml
 
 def run_nmap_scan(url, scan_type):
     """Run Nmap scan using instrumentisto/nmap Docker image"""
@@ -135,7 +144,7 @@ def run_nmap_scan(url, scan_type):
         'instrumentisto/nmap'
     ]
     if scan_type == 'nmap_deep':
-        cmd.extend(['-A', '--script', 'vulners', '-', '-oN', '/host/nmap_output.txt'])
+        cmd.extend(['-sT', '-sV', '--script', 'vulners', '-oN', '/host/nmap_output.txt'])
         print(f"Running nmap_deep with target: {target} and command: {' '.join(cmd + [target])}")
     else:  # nmap_regular
         cmd.extend(['-A', '-oX', '-'])
@@ -182,6 +191,37 @@ def run_nmap_scan(url, scan_type):
     finally:
         if os.path.exists(temp_dir) and not os.listdir(temp_dir):
             os.rmdir(temp_dir)
+'''
+
+def run_nmap_scan(url, scan_type):
+    """Run Nmap scan using instrumentisto/nmap Docker image"""
+    if MOCK_MODE:
+        mock_path = os.path.join(MOCK_REPORTS_DIR, 'nmap_report.xml')
+        if not os.path.exists(mock_path):
+            raise FileNotFoundError(f"Mock report not found: {mock_path}")
+        with open(mock_path, 'r') as f:
+            return f.read()
+
+    target = extract_host(url)
+    cmd = ['docker', 'run', '--rm', 'instrumentisto/nmap']
+    if scan_type == 'nmap_deep':
+        cmd.extend(['-sT', '-sV', '--script', 'vulners', '-oX', '-'])
+    else:
+        cmd.extend(['-A', '-oX', '-'])
+    cmd.append(target)
+
+    try:
+        process = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=300
+        )
+        return process.stdout
+    except subprocess.TimeoutExpired:
+        raise Exception("Nmap scan timed out after 5 minutes.")
+    except subprocess.CalledProcessError as e:
+        raise Exception(f"Nmap scan failed: {e.output}")
 
 def run_zap_scan(url, scan_type, report_dir, report_filename):
     """Run ZAP scan using zap-baseline.py or zap-full-scan.py"""
