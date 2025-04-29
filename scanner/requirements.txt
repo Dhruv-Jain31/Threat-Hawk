@@ -17,6 +17,10 @@ urllib3==2.3.0
 # ZAP dependencies
 python-owasp-zap-v2.4==0.1.0
 
+#scraper dependency
+beautifulsoup4==4.12.3
+lxml==5.3.0
+
 # CORS dependency
 flask-cors==5.0.1
 # Optional: For production deployment

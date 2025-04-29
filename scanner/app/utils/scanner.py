@@ -59,7 +59,7 @@ def run_nmap_scan(url, scan_type):
     target = extract_host(url)
     cmd = ['docker', 'run', '--rm', 'instrumentisto/nmap']
     if scan_type == 'nmap_deep':
-        cmd.extend(['-A', '--script', 'vulners', '-oX', '-'])
+        cmd.extend(['-A', '--script', 'vulners', '-oX', '-', '--script-trace'])  # Add --script-trace for debugging
     else:
         cmd.extend(['-A', '-oX', '-'])
     cmd.append(target)
@@ -71,11 +71,20 @@ def run_nmap_scan(url, scan_type):
             text=True,
             timeout=300
         )
-        return process.stdout
+        output = process.stdout
+        error = process.stderr
+
+        # Check if vulners script ran (look for CVSS or vulners output in XML)
+        if scan_type == 'nmap_deep' and '<script id="vulners"' not in output and 'CVSS' not in output:
+            print(f"Warning: Vulners script may not have executed properly. stderr: {error}")
+            # Optionally, raise an exception or log this for debugging
+            # raise Exception("Vulners script did not produce expected output")
+
+        return output
     except subprocess.TimeoutExpired:
         raise Exception("Nmap scan timed out after 5 minutes.")
     except subprocess.CalledProcessError as e:
-        raise Exception(f"Nmap scan failed: {e.output}")
+        raise Exception(f"Nmap scan failed: {e.stderr}")
 
 def run_zap_scan(url, scan_type, report_dir, report_filename):
     """Run ZAP scan using zap-baseline.py or zap-full-scan.py"""

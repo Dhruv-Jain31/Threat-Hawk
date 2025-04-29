@@ -3,7 +3,7 @@ env:
   - excludePaths: []
     name: baseline
     urls:
-    - https://testaspnet.vulnweb.com/
+    - https://futics.org/
   parameters:
     failOnError: true
     progressToStdout: false
@@ -14,7 +14,7 @@ jobs:
   type: passiveScan-config
 - parameters:
     maxDuration: 1
-    url: https://testaspnet.vulnweb.com/
+    url: https://futics.org/
   type: spider
 - parameters:
     maxDuration: 0
@@ -27,7 +27,7 @@ jobs:
 - parameters:
     reportDescription: ''
     reportDir: /zap/wrk/
-    reportFile: e971a7a5-9076-4374-8e0e-bb0f909622af.html
+    reportFile: e8725ffe-6baf-4148-8097-c7e7fa6ce086.html
     reportTitle: ZAP Scanning Report
     template: traditional-html
   type: report
