@@ -27,7 +27,7 @@ jobs:
 - parameters:
     reportDescription: ''
     reportDir: /zap/wrk/
-    reportFile: d9a34ea8-f5f3-4277-a7ee-02b1502f1780_20250427_173012_report.html
+    reportFile: e8725ffe-6baf-4148-8097-c7e7fa6ce086.html
     reportTitle: ZAP Scanning Report
     template: traditional-html
   type: report
