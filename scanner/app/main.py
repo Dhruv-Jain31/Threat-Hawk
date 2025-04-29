@@ -120,8 +120,13 @@ def scan_and_scrape():
         # Scrape the report
         scraped_data = process_scan_response(scan_response)
 
+        # Safeguard against None or non-dictionary responses
+        if scraped_data is None or not isinstance(scraped_data, dict):
+            logger.error(f"Invalid scraped data for Report ID: {report_id}, data: {scraped_data}")
+            return jsonify({"error": "Failed to process scan data"}), 500
+
         if "error" in scraped_data:
-            logger.error(f"Scraping failed for Report ID: {report_id}")
+            logger.error(f"Scraping failed for Report ID: {report_id}, error: {scraped_data['error']}")
             return jsonify({"error": scraped_data["error"]}), 500
 
         logger.info(f"Scan and scrape completed for URL: {url}, Scan Type: {scan_type}, Report ID: {report_id}")

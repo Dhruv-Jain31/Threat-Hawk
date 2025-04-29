@@ -3,6 +3,7 @@ import logging
 import xml.etree.ElementTree as ET
 import uuid
 import os
+import re
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -309,8 +310,146 @@ def scrape_nmap_report(report_path, scan_type_full="nmap_regular"):
             "error": f"Failed to process report: {str(e)}"
         }
 
+def scrape_nmap_deep_report(report_path, scan_type_full="nmap_deep"):
+    """Parse an Nmap deep report using regex to extract host, ports, and vulnerabilities."""
+    # Default result structure
+    result = {
+        "scan_type_full": scan_type_full,
+        "metadata": {
+            "scanner": "nmap",
+            "version": "",
+            "start_time": "",
+            "args": "",
+            "scan_type": ""
+        },
+        "summary": {
+            "open_ports": 0,
+            "filtered_ports": 0,
+            "total_scanned_ports": 0,
+            "hosts_up": 0,
+            "hosts_down": 0
+        },
+        "hosts": []
+    }
+
+    # Check if file exists
+    if not os.path.exists(report_path):
+        logger.error(f"Report file not found: {report_path}")
+        return result
+
+    try:
+        # Read the file
+        with open(report_path, 'r', encoding='utf-8') as file:
+            content = file.read()
+
+        # Initialize host data
+        host_data = {
+            "ip_address": "",
+            "hostnames": [],
+            "status": "",
+            "reason": "",
+            "round_trip_time": 0,
+            "open_ports": []
+        }
+
+        # Extract IP address
+        ip_match = re.search(r'<address>(.*?)</address>', content)
+        if ip_match:
+            host_data["ip_address"] = ip_match.group(1)
+            logger.debug(f"Found IP: {host_data['ip_address']}")
+
+        # Extract hostname
+        hostname_match = re.search(r'<hostname>(.*?)</hostname>', content)
+        if hostname_match and hostname_match.group(1):
+            host_data["hostnames"].append({"name": hostname_match.group(1), "type": "user"})
+            logger.debug(f"Found hostname: {host_data['hostnames']}")
+
+        # Infer status from OS
+        os_match = re.search(r'<os>(.*?)</os>', content)
+        if os_match:
+            host_data["status"] = "up"
+            host_data["reason"] = "OS detected"
+            result["summary"]["hosts_up"] = 1
+            logger.debug("Host status set to 'up'")
+
+        # Extract ports
+        ports_match = re.finditer(r'<port number="(\d+)" state="(\w+)">(.*?)</port>', content, re.DOTALL)
+        for port_match in ports_match:
+            port_number = port_match.group(1)
+            port_state = port_match.group(2)
+            port_content = port_match.group(3)
+
+            if port_state != "open":
+                continue
+
+            port_data = {
+                "portid": port_number,
+                "protocol": "tcp",
+                "service": {
+                    "name": "",
+                    "version": "",
+                },
+                "vulnerabilities": []
+            }
+
+            # Extract service details
+            service_match = re.search(r'<service name="([^"]+)" version="([^"]*)"', port_content)
+            if service_match:
+                port_data["service"]["name"] = service_match.group(1)
+                port_data["service"]["version"] = service_match.group(2)
+                logger.debug(f"Port {port_number} service: {port_data['service']}")
+
+            # Extract vulnerabilities
+            vuln_sections = re.findall(r'<vulnerabilities>(.*?)</vulnerabilities>', port_content, re.DOTALL)
+            seen_vulns = set()  # For deduplication
+            for vuln_section in vuln_sections:
+                vuln_matches = re.finditer(
+                    r'<vulnerability>\s*<id>(.*?)</id>\s*<cvss_score>(.*?)</cvss_score>\s*<exploit_url>(.*?)</exploit_url>\s*</vulnerability>',
+                    vuln_section, re.DOTALL
+                )
+                for vuln_match in vuln_matches:
+                    vuln_id = vuln_match.group(1)
+                    if vuln_id in seen_vulns:
+                        continue
+                    seen_vulns.add(vuln_id)
+
+                    cvss_score = float(vuln_match.group(2)) if vuln_match.group(2).strip() else 0.0
+                    if cvss_score >= 8:
+                        vulnerability = {
+                            "vulners_id": vuln_id,
+                            "cvss_score": cvss_score,
+                            "exploit_url": vuln_match.group(3)
+                        }
+                        # Remove empty fields
+                        vulnerability = {k: v for k, v in vulnerability.items() if v}
+                        port_data["vulnerabilities"].append(vulnerability)
+                        logger.debug(f"Port {port_number} vulnerability added: {vuln_id}")
+
+            host_data["open_ports"].append(port_data)
+            result["summary"]["open_ports"] += 1
+            logger.debug(f"Processed open port {port_number}")
+
+        # Add host to result if we have data
+        if host_data["ip_address"] or host_data["hostnames"]:
+            result["hosts"].append(host_data)
+            logger.debug("Host added to result")
+
+        logger.info(f"Successfully parsed report: {report_path}")
+        return result
+
+    except Exception as e:
+        logger.error(f"Error parsing report {report_path}: {str(e)}")
+        return result  # Always return the default structure
+
 def process_scan_response(scan_response):
     """Process the scan response and scrape the report for dashboard display."""
+    result = {
+        "report_id": scan_response.get("report_id", ""),
+        "report_path": scan_response.get("report_path", ""),
+        "scan_type": scan_response.get("scan_type", ""),
+        "scan_type_full": scan_response.get("scan_type_full", ""),
+        "is_deep": False
+    }
     try:
         report_id = scan_response.get("report_id")
         report_path = scan_response.get("report_path")
@@ -319,15 +458,10 @@ def process_scan_response(scan_response):
 
         if not os.path.exists(report_path):
             logger.error(f"Report file not found: {report_path}")
-            return {"error": f"Report file not found: {report_path}"}
+            result["error"] = f"Report file not found: {report_path}"
+            return result
 
-        result = {
-            "report_id": report_id,
-            "report_path": report_path,
-            "scan_type": scan_type,
-            "scan_type_full": scan_type_full,
-            "is_deep": "deep" in scan_type_full.lower()
-        }
+        result["is_deep"] = "deep" in scan_type_full.lower()
 
         if "zap" in scan_type.lower():
             zap_result = scrape_zap_report(
@@ -343,21 +477,22 @@ def process_scan_response(scan_response):
             if "error" in zap_result:
                 result["error"] = zap_result["error"]
         elif "nmap" in scan_type.lower():
-            nmap_result = scrape_nmap_report(report_path, scan_type_full=scan_type_full)
+            if result["is_deep"]:
+                nmap_result = scrape_nmap_deep_report(report_path, scan_type_full=scan_type_full)
+            else:
+                nmap_result = scrape_nmap_report(report_path, scan_type_full=scan_type_full)
             result.update({
-                "metadata": nmap_result["metadata"],
-                "summary": nmap_result["summary"],
-                "hosts": nmap_result["hosts"],
-                "total_hosts": nmap_result["total_hosts"]
+                "metadata": nmap_result.get("metadata", {}),
+                "summary": nmap_result.get("summary", {"open_ports": 0, "filtered_ports": 0, "total_scanned_ports": 0, "hosts_up": 0, "hosts_down": 0}),
+                "hosts": nmap_result.get("hosts", []),
+                "total_hosts": nmap_result.get("total_hosts", 0) if not result["is_deep"] else len(nmap_result.get("hosts", []))
             })
             if "error" in nmap_result:
                 result["error"] = nmap_result["error"]
-        else:
-            logger.error(f"Unsupported scan type: {scan_type}")
-            return {"error": f"Unsupported scan type: {scan_type}"}
 
         return result
 
     except Exception as e:
         logger.error(f"Error processing scan response: {str(e)}")
-        return {"error": f"Error processing scan response: {str(e)}"}
+        result["error"] = f"Error processing scan response: {str(e)}"
+        return result
