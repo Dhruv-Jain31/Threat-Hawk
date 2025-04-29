@@ -49,7 +49,6 @@ def check_zap_api(zap_port):
     """Check if ZAP API is accessible with retries (not used for CLI)"""
     return True
 
-'''
 def parse_nmap_txt_to_xml(txt_output, target_hostname):
     """Convert Nmap .txt output to XML format and pretty-print it"""
     root = ET.Element("nmap_scan")
@@ -191,8 +190,8 @@ def run_nmap_scan(url, scan_type):
     finally:
         if os.path.exists(temp_dir) and not os.listdir(temp_dir):
             os.rmdir(temp_dir)
-'''
 
+'''
 def run_nmap_scan(url, scan_type):
     """Run Nmap scan using instrumentisto/nmap Docker image"""
     if MOCK_MODE:
@@ -222,6 +221,7 @@ def run_nmap_scan(url, scan_type):
         raise Exception("Nmap scan timed out after 5 minutes.")
     except subprocess.CalledProcessError as e:
         raise Exception(f"Nmap scan failed: {e.output}")
+'''
 
 def run_zap_scan(url, scan_type, report_dir, report_filename):
     """Run ZAP scan using zap-baseline.py or zap-full-scan.py"""
