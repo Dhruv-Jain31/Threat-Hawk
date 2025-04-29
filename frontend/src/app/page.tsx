@@ -263,73 +263,85 @@ export default function ThreatHawk() {
           </nav>
         </header>
 
+
+
+
         <main id="main-content" className="flex-1 relative">
-          <section id="hero" className="bg-neutral-900 text-white min-h-[70vh] pt-20">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col lg:flex-row items-center justify-between py-12">
-              <div className="lg:w-1/2 space-y-8">
-                <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight">
-                  Secure Your Web Apps with <span className="text-blue-500">ThreatHawk</span>
-                </h1>
-                <p className="text-xl text-gray-300">
-                  Open-source vulnerability scanner that detects OWASP Top 10 security issues in your web applications with just one click.
-                </p>
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <form className="flex-1 flex gap-4">
-                    <input
-                      type="url"
-                      placeholder="Enter your website URL"
-                      className="flex-1 px-6 py-3 rounded-lg bg-neutral-800 border border-neutral-700 focus:outline-none focus:border-blue-500 text-white"
-                      required
-                    />
-                    <button
-                      type="submit"
-                      className="px-8 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition-colors"
-                    >
-                      Scan Now
-                    </button>
-                  </form>
-                </div>
-                <div className="flex items-center gap-4 text-sm text-gray-400">
-                  <div className="flex items-center">
-                    <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                      <path
-                        fillRule="evenodd"
-                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                    Free & Open Source
-                  </div>
-                  <div className="flex items-center">
-                    <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                      <path
-                        fillRule="evenodd"
-                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                    OWASP Top 10 Detection
-                  </div>
-                </div>
-              </div>
-              <div className="lg:w-1/2 mt-12 lg:mt-0">
-                <div className="relative">
-                  <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg blur opacity-30"></div>
-                  <div className="relative bg-neutral-800 p-6 rounded-lg border border-neutral-700">
-                    <pre className="text-sm text-gray-300 font-mono">
-                      <span className="text-blue-400">$</span> threathawk scan --url example.com
-                      <span className="text-green-400">✓</span> Initializing security scan...
-                      <span className="text-green-400">✓</span> Checking for SQL Injection...
-                      <span className="text-green-400">✓</span> Analyzing XSS vulnerabilities...
-                      <span className="text-green-400">✓</span> Detecting CSRF issues...
-                      <span className="text-yellow-400">!</span> Scan complete. View detailed report...
-                    </pre>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-neutral-900 to-transparent"></div>
-          </section>
+        <section id="hero" className="bg-neutral-900 text-white min-h-[70vh] pt-20">
+  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col lg:flex-row items-center justify-between py-12 gap-12">
+    
+    {/* Left Content */}
+    <div className="w-full lg:w-1/2 space-y-6 text-center lg:text-left">
+      <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold leading-tight">
+        Secure Your Web Apps with <span className="text-blue-500">ThreatHawk</span>
+      </h1>
+      <p className="text-base sm:text-lg md:text-xl text-gray-300">
+        Open-source vulnerability scanner that detects OWASP Top 10 security issues in your web applications with just one click.
+      </p>
+
+      {/* Form */}
+      <form className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto items-stretch sm:items-center">
+        <input
+          type="url"
+          placeholder="Enter your website URL"
+          className="flex-1 px-5 py-3 rounded-lg bg-neutral-800 border border-neutral-700 focus:outline-none focus:border-blue-500 text-white"
+          required
+        />
+        <button
+          type="submit"
+          className="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition-colors"
+        >
+          Scan Now
+        </button>
+      </form>
+
+      {/* Features */}
+      <div className="flex flex-wrap justify-center lg:justify-start gap-4 text-sm text-gray-400">
+        <div className="flex items-center">
+          <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+            <path
+              fillRule="evenodd"
+              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+              clipRule="evenodd"
+            />
+          </svg>
+          Free & Open Source
+        </div>
+        <div className="flex items-center">
+          <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+            <path
+              fillRule="evenodd"
+              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+              clipRule="evenodd"
+            />
+          </svg>
+          OWASP Top 10 Detection
+        </div>
+      </div>
+    </div>
+
+    {/* Right Terminal Preview */}
+    <div className="w-full lg:w-1/2">
+      <div className="relative mx-auto max-w-md">
+        <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg blur opacity-30"></div>
+        <div className="relative bg-neutral-800 p-4 sm:p-6 rounded-lg border border-neutral-700 overflow-auto max-h-64">
+          <pre className="text-sm sm:text-base text-gray-300 font-mono whitespace-pre-wrap">
+            <span className="text-blue-400">$</span> threathawk scan --url example.com{'\n'}
+            <span className="text-green-400">✓</span> Initializing security scan...{'\n'}
+            <span className="text-green-400">✓</span> Checking for SQL Injection...{'\n'}
+            <span className="text-green-400">✓</span> Analyzing XSS vulnerabilities...{'\n'}
+            <span className="text-green-400">✓</span> Detecting CSRF issues...{'\n'}
+            <span className="text-yellow-400">!</span> Scan complete. View detailed report...
+          </pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {/* Bottom Gradient */}
+  <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-neutral-900 to-transparent"></div>
+</section>
+
 
           <section id="features" className="py-20 bg-white">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -803,6 +815,9 @@ export default function ThreatHawk() {
 
             </div>
           </section>
+
+
+
           <div className="mt-20  bg-white my-12 ">
   <h3 className="text-3xl font-bold mb-10 text-center text-gray-800">Frequently Asked Questions</h3>
   <div className="max-w-3xl mx-auto space-y-6" id="faq-container">
