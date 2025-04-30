@@ -146,7 +146,7 @@ def run_nmap_scan(url, scan_type):
         cmd.extend(['-sT', '-sV', '--script', 'vulners', '-oN', '/host/nmap_output.txt'])
         print(f"Running nmap_deep with target: {target} and command: {' '.join(cmd + [target])}")
     else:  # nmap_regular
-        cmd.extend(['-A', '-oX', '-'])
+        cmd.extend(['-A', '-sT', '-oX', '-'])
         print(f"Running nmap_regular with target: {target} and command: {' '.join(cmd)}")
     cmd.append(target)
 
