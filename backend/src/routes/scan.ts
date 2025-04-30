@@ -1,5 +1,5 @@
 import express, { Request, Response, RequestHandler } from 'express';
-//import { authMiddleware } from '../middleware/auth';
+import { authMiddleware } from '../middleware/auth';
 import prisma from '../client';
 import { triggerFlaskScan } from '../utils/flaskClient';
 import path from 'path';
