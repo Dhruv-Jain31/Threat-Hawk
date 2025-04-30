@@ -90,11 +90,9 @@ def scrape_zap_report(report_path, scan_type_full="zap_regular", include_all_sev
 
             description_tag = table.find('td', string='Description')
             description = description_tag.find_next_sibling('td').get_text(strip=True) if description_tag else ""
-            description = truncate_text(description)
 
             solution_tag = table.find('td', string='Solution')
             solution = solution_tag.find_next_sibling('td').get_text(strip=True) if solution_tag else ""
-            solution = truncate_text(solution) or "Review server configuration."
 
             # Extract one representative instance
             example_instance = {}

@@ -3,7 +3,7 @@ env:
   - excludePaths: []
     name: baseline
     urls:
-    - https://upes.ac.in
+    - http://testasp.vulnweb.com
   parameters:
     failOnError: true
     progressToStdout: false
@@ -14,7 +14,7 @@ jobs:
   type: passiveScan-config
 - parameters:
     maxDuration: 1
-    url: https://upes.ac.in
+    url: http://testasp.vulnweb.com
   type: spider
 - parameters:
     maxDuration: 0
@@ -27,7 +27,7 @@ jobs:
 - parameters:
     reportDescription: ''
     reportDir: /zap/wrk/
-    reportFile: 9f69c3ae-9175-4991-91d0-8a7147954704.html
+    reportFile: d60e18bc-f6db-4179-b322-b7fd97771d9f.html
     reportTitle: ZAP Scanning Report
     template: traditional-html
   type: report
