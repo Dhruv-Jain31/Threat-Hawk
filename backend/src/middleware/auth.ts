@@ -1,14 +1,27 @@
 import { Request, Response, RequestHandler } from 'express';
 import { verify } from 'jsonwebtoken';
+import { PrismaClient } from '@prisma/client';
 
-// Type for decoded JWT payload
+const prisma = new PrismaClient();
+
 interface JwtPayload {
   userId: string;
+  email?: string;
   username?: string;
-  role?: string; // Optional role for RBAC
 }
 
-// Authentication middleware to verify JWT and extract userId
+declare global {
+  namespace Express {
+    interface Request {
+      user?: {
+        id: number;
+        username: string;
+        email: string;
+      };
+    }
+  }
+}
+
 export const authMiddleware: RequestHandler = async (req: Request, res: Response, next: Function): Promise<void> => {
   const authHeader = req.headers.authorization;
 
@@ -18,21 +31,28 @@ export const authMiddleware: RequestHandler = async (req: Request, res: Response
   }
 
   const token = authHeader.split(' ')[1];
+  console.log('Received token:', token); // Log the token
 
   try {
-    // Verify JWT token using NextAuth secret
     const decoded = verify(token, process.env.NEXTAUTH_SECRET || 'secret') as JwtPayload;
-    console.log('Decoded JWT:', decoded); // Log to confirm userId is present
+    console.log('Decoded JWT:', decoded);
 
     if (!decoded.userId) {
       res.status(401).json({ error: 'Unauthorized: Invalid token payload' });
       return;
     }
 
-    // Add userId to request body (or use req.user for better practice)
-    req.body.userId = parseInt(decoded.userId, 10);
-    req.body.role = decoded.role || 'user'; // Default to 'user' role
+    const user = await prisma.user.findUnique({
+      where: { id: parseInt(decoded.userId, 10) },
+      select: { id: true, username: true, email: true },
+    });
 
+    if (!user) {
+      res.status(401).json({ error: 'Unauthorized: User not found' });
+      return;
+    }
+
+    req.user = user;
     next();
   } catch (error) {
     console.error('JWT verification error:', error);
@@ -40,16 +60,13 @@ export const authMiddleware: RequestHandler = async (req: Request, res: Response
   }
 };
 
-// Role-based access control middleware
 export const restrictTo = (...allowedRoles: string[]): RequestHandler => {
   return (req: Request, res: Response, next: Function): void => {
-    const userRole = req.body.role;
-
+    const userRole = req.body.role || 'user';
     if (!userRole || !allowedRoles.includes(userRole)) {
       res.status(403).json({ error: 'Forbidden: Insufficient permissions' });
       return;
     }
-
     next();
   };
 };

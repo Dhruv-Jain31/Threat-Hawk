@@ -3,7 +3,7 @@ env:
   - excludePaths: []
     name: baseline
     urls:
-    - https://futics.org/
+    - https://upes.ac.in
   parameters:
     failOnError: true
     progressToStdout: false
@@ -14,7 +14,7 @@ jobs:
   type: passiveScan-config
 - parameters:
     maxDuration: 1
-    url: https://futics.org/
+    url: https://upes.ac.in
   type: spider
 - parameters:
     maxDuration: 0
@@ -27,7 +27,7 @@ jobs:
 - parameters:
     reportDescription: ''
     reportDir: /zap/wrk/
-    reportFile: d1f971c4-ad6c-42f2-bd3e-22ea695a05ad.html
+    reportFile: 9f69c3ae-9175-4991-91d0-8a7147954704.html
     reportTitle: ZAP Scanning Report
     template: traditional-html
   type: report
