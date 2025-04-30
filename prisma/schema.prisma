@@ -12,7 +12,9 @@ datasource db {
 // Enums
 enum ScanType {
   WEB
+  WEB_DEEP
   NETWORK
+  NETWORK_DEEP
 }
 
 enum ScanStatus {
