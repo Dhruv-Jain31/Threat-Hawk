@@ -1,118 +1,134 @@
 import express, { Request, Response, RequestHandler } from 'express';
-import axios, { AxiosError } from 'axios';
+import { authMiddleware } from '../middleware/auth';
 import prisma from '../client';
-import { authMiddleware, restrictTo } from '../middleware/auth';
+import { triggerFlaskScan } from '../utils/flaskClient';
+import path from 'path';
+import fs from 'fs';
+
+// Wrapper to handle async RequestHandler
+const asyncHandler = (fn: (req: Request, res: Response, next: Function) => Promise<any>): RequestHandler => {
+  return (req, res, next) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
+};
 
 const router = express.Router();
 
-// Type for scan request body
-interface ScanRequestBody {
-  url: string;
-  scan_type: 'zap_regular' | 'zap_deep' | 'nmap_regular' | 'nmap_deep';
-  userId?: number; // Added by authMiddleware
-  role?: string; // Added by authMiddleware
-}
+// Map frontend scan types to Flask scan types
+const scanTypeMap: { [key: string]: string } = {
+  WEB: 'zap_regular',
+  WEB_DEEP: 'zap_deep',
+  NETWORK: 'nmap_regular',
+  NETWORK_DEEP: 'nmap_deep',
+};
 
-// Type for Flask response (adjust based on your Flask server's response structure)
-interface FlaskResponse {
-  scan_result: any; // JSON output from scraper
-  report_path?: string; // Path to report file
-}
+// Trigger a scan
+const scanHandler = asyncHandler(async (req: Request, res: Response) => {
+  const { target, type } = req.body;
+  const userId = req.user?.id;
 
-// Trigger a scan and save to database
-const scanHandler: RequestHandler = async (req: Request<{}, {}, ScanRequestBody>, res: Response): Promise<void> => {
-  const { url, scan_type, userId } = req.body;
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthorized: User not authenticated' });
+  }
 
-  console.log('Received userId:', userId); // Log to confirm userId is received
+  if (!target || !type || !['WEB', 'WEB_DEEP', 'NETWORK', 'NETWORK_DEEP'].includes(type)) {
+    return res.status(400).json({ error: 'Invalid request: target and type are required' });
+  }
+
+  let scanId: number | undefined;
 
   try {
-    // Validate request body
-    if (!url || !scan_type || !userId) {
-      res.status(400).json({ error: 'url, scan_type, and userId are required' });
-      return;
-    }
-
-    const validScanTypes = ['zap_regular', 'zap_deep', 'nmap_regular', 'nmap_deep'];
-    if (!validScanTypes.includes(scan_type)) {
-      res.status(400).json({ error: 'Invalid scan_type' });
-      return;
-    }
-
-    // Determine scan type for Prisma (WEB or NETWORK)
-    const prismaScanType = scan_type.startsWith('zap') ? 'WEB' : 'NETWORK';
-
-    // Create a pending scan record in the database
+    // Create a pending scan record
     const scan = await prisma.scan.create({
       data: {
-        type: prismaScanType,
-        target: url,
+        type,
+        target,
         status: 'PENDING',
         userId,
       },
     });
+    scanId = scan.id;
 
-    try {
-      // Make request to Flask server
-      const flaskResponse = await axios.post<FlaskResponse>(
-        `${process.env.FLASK_SERVER_URL}/scan`,
-        { url, scan_type },
-        {
-          headers: { 'Content-Type': 'application/json' },
-          timeout: 60000, // 60 seconds
-        }
-      );
+    // Trigger Flask scan
+    const flaskResponse = await triggerFlaskScan(target, scanTypeMap[type] || 'nmap_regular');
 
-      // Update scan record with results
+    // Log the response for debugging
+    console.log('Full Flask response:', JSON.stringify(flaskResponse, null, 2));
+
+    // Set scanResult based on presence of expected fields
+    let scanResult: any = null;
+    if (flaskResponse) {
+      scanResult = flaskResponse;
+    }
+
+    // Update scan record
+    const reportPath = scanResult
+      ? path.join(__dirname, '../../scanner/reports', `${scan.id}.xml`)
+      : null;
+
+    await prisma.scan.update({
+      where: { id: scan.id },
+      data: {
+        status: scanResult ? 'SUCCESS' : 'FAILED',
+        scanResult,
+        reportPath,
+      },
+    });
+
+    return res.status(200).json({
+      status: 'success',
+      scanId: scan.id,
+      message: 'Scan completed',
+      scanResult,
+    });
+  } catch (error: any) {
+    console.error('Scan error:', error);
+    if (scanId) {
       await prisma.scan.update({
-        where: { id: scan.id },
-        data: {
-          status: 'SUCCESS',
-          scanResult: flaskResponse.data.scan_result,
-          reportPath: flaskResponse.data.report_path || null,
-        },
-      });
-
-      res.status(200).json({
-        message: 'Scan completed successfully',
-        scan: {
-          id: scan.id,
-          type: prismaScanType,
-          target: url,
-          status: 'SUCCESS',
-          scanResult: flaskResponse.data.scan_result,
-          reportPath: flaskResponse.data.report_path,
-        },
-      });
-    } catch (flaskError) {
-      // Update scan status to FAILED if Flask request fails
-      await prisma.scan.update({
-        where: { id: scan.id },
+        where: { id: scanId },
         data: { status: 'FAILED' },
       });
-
-      throw flaskError; // Let the outer catch handle the response
     }
-  } catch (error) {
-    console.error('Error triggering scan:', error);
-    const axiosError = error as AxiosError;
-    if (axiosError.response) {
-      // Flask server responded with an error
-      res.status(axiosError.response.status).json({
-        error: axiosError.response.data.error || 'Flask server error',
-      });
-    } else if (axiosError.request) {
-      // No response from Flask server
-      res.status(503).json({ error: 'Flask server unreachable' });
-    } else {
-      // Other errors
-      res.status(500).json({ error: 'Internal server error' });
-    }
+    return res.status(500).json({ error: `Scan failed: ${error.message || 'Unknown error'}` });
   }
-};
+});
 
-// Apply authMiddleware to all scan routes
-// Example: Restrict zap_deep and nmap_deep to admins
+// Download a scan report
+const downloadHandler = asyncHandler(async (req: Request, res: Response) => {
+  const { scanId } = req.params;
+  const userId = req.user?.id;
+
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthorized: User not authenticated' });
+  }
+
+  try {
+    const scan = await prisma.scan.findUnique({
+      where: { id: parseInt(scanId, 10) },
+      select: { reportPath: true, userId: true, type: true },
+    });
+
+    if (!scan) {
+      return res.status(404).json({ error: 'Scan not found' });
+    }
+
+    if (scan.userId !== userId) {
+      return res.status(403).json({ error: 'Forbidden: You do not own this scan' });
+    }
+
+    if (!scan.reportPath || !fs.existsSync(scan.reportPath)) {
+      return res.status(404).json({ error: 'Report file not found' });
+    }
+
+    const fileName = `scan_${scanId}_${scan.type.toLowerCase()}.${scan.type.startsWith('WEB') ? 'html' : 'xml'}`;
+    res.download(scan.reportPath, fileName);
+  } catch (error: any) {
+    console.error('Download error:', error);
+    return res.status(500).json({ error: `Failed to download report: ${error.message || 'Unknown error'}` });
+  }
+});
+
 router.post('/', authMiddleware, scanHandler);
-// router.post('/', authMiddleware, restrictTo('admin'), scanHandler); // Uncomment for admin-only scans
+router.get('/download/:scanId', authMiddleware, downloadHandler);
 
 export default router;
