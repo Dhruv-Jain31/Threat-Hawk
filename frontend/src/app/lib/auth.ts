@@ -21,14 +21,12 @@ export const authOptions: NextAuthOptions = {
             },
             async authorize(credentials) {
                 try {
-                    // Validate credentials with Zod
                     credentialsSchema.parse(credentials);
 
                     if (!credentials?.email || !credentials?.password) {
                         throw new Error('Missing email or password.');
                     }
 
-                    // Call the backend API using Axios
                     const response = await axios.post(
                         `${process.env.BACKEND_API_URL || 'http://localhost:5000'}/api/auth/login`,
                         {
@@ -75,7 +73,7 @@ export const authOptions: NextAuthOptions = {
                     id: profile.id.toString(),
                     name: profile.name || profile.login,
                     email: profile.email,
-                    username: profile.login, // GitHub username
+                    username: profile.login,
                 };
             },
         }),
@@ -85,10 +83,9 @@ export const authOptions: NextAuthOptions = {
 
     callbacks: {
         async signIn({ user, account }) {
-            console.log('signIn callback:', { user, account }); // Log user and account data
+            console.log('signIn callback:', { user, account });
             if (account?.provider === 'google' || account?.provider === 'github') {
                 try {
-                    // Call backend to create/update OAuth user
                     const response = await axios.post(
                         `${process.env.BACKEND_API_URL || 'http://localhost:5000'}/api/auth/oauth`,
                         {
@@ -104,25 +101,15 @@ export const authOptions: NextAuthOptions = {
                     );
 
                     const { user: dbUser } = response.data;
-
-                    // Update user object with database ID
                     user.id = dbUser.id.toString();
                     user.username = dbUser.username;
-
-                    return true; // Allow sign-in
+                    return true;
                 } catch (error) {
                     console.error('OAuth sign-in error:', error);
-                    if (axios.isAxiosError(error)) {
-                        console.error('Axios error details:', {
-                            status: error.response?.status,
-                            data: error.response?.data,
-                            message: error.message,
-                        });
-                    }
-                    return false; // Deny sign-in on error
+                    return false;
                 }
             }
-            return true; // Allow sign-in for credentials
+            return true;
         },
 
         async jwt({ token, user }) {
@@ -144,9 +131,10 @@ export const authOptions: NextAuthOptions = {
 
     session: {
         strategy: 'jwt',
+        maxAge: 24 * 60 * 60, // 24 hours
     },
 
-    /*pages: {
-        signIn: '/auth/signin',
-    },*/
+    jwt: {
+        secret: process.env.NEXTAUTH_SECRET || 'secret',
+    },
 };

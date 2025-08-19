@@ -24,6 +24,8 @@ enum ScanStatus {
   FAILED
 }
 
+
+
 // Models
 
 model User {
