@@ -1,154 +1,72 @@
-import React from "react";
+'use client';
 
-const Dashboard = () => {
-  return (
-    <div className="min-h-screen bg-neutral-50 py-8 px-4 sm:px-6 lg:px-8">
-      {/* Header */}
-      <div className="mb-8 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-neutral-900">Security Dashboard</h1>
-        <button className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors duration-200">
-          New Scan
-        </button>
-      </div>
+import { useState } from 'react';
+import { useApi } from '../../hooks/useApi';
 
+export default function NewScanPage() {
+    const [target, setTarget] = useState('');
+    const [scanType, setScanType] = useState('WEB');
+    const { apiCall, loading } = useApi();
 
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        
+        const result = await apiCall('/api/scan-and-scrape', {
+            method: 'POST',
+            body: JSON.stringify({ target, type: scanType }),
+        });
 
-   
+        if (result.error) {
+            alert(`Error: ${result.error}`);
+        } else {
+            alert('Scan started successfully!');
+            setTarget('');
+        }
+    };
 
+    return (
+        <div className="max-w-2xl mx-auto">
+            <h1 className="text-2xl font-bold mb-6">New Security Scan</h1>
+            
+            <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                    <label className="block text-sm font-medium mb-2">
+                        Target URL
+                    </label>
+                    <input
+                        type="url"
+                        value={target}
+                        onChange={(e) => setTarget(e.target.value)}
+                        className="w-full px-3 py-2 border rounded-md"
+                        placeholder="https://example.com"
+                        required
+                    />
+                </div>
 
- {/* Quick Scan Form */}
- <div className="bg-white rounded-lg border border-neutral-200/30 p-6">
-  <h2 className="text-lg font-semibold text-neutral-900 mb-4">Scan Options</h2>
-  <form className="space-y-4">
-    <div>
-      <label htmlFor="url" className="block text-sm font-medium text-neutral-700">
-        Website URL
-      </label>
-      <div className="mt-1 flex rounded-md shadow-lg">
-        <input 
-          type="url" 
-          id="url" 
-          placeholder="https://upes.beta.ac.in" 
-          className="flex-1 block w-full text-lg px-3 py-6 rounded-md border border-neutral-300 focus:ring-indigo-500 focus:border-indigo-500"
-        />
-      </div>
-    </div>
+                <div>
+                    <label className="block text-sm font-medium mb-2">
+                        Scan Type
+                    </label>
+                    <select
+                        value={scanType}
+                        onChange={(e) => setScanType(e.target.value)}
+                        className="w-full px-3 py-2 border rounded-md"
+                    >
+                        <option value="WEB">Web Application Scan</option>
+                        <option value="WEB_DEEP">Deep Web Scan</option>
+                        <option value="NETWORK">Network Scan</option>
+                        <option value="NETWORK_DEEP">Deep Network Scan</option>
+                    </select>
+                </div>
 
-    <div className="flex space-x-4">
-      <div className="w-full">
-        <label htmlFor="scan-type" className="block text-sm font-medium text-neutral-700">
-          Scan Type
-        </label>
-        <select 
-          id="scan-type" 
-          className="block w-full px-3 py-2 rounded-md border border-neutral-300 focus:ring-indigo-500 focus:border-indigo-500"
-        >
-          <option value="network">Network Scan</option>
-          <option value="owasp">OWASP Scan</option>
-          <option value="boht">Network + OWASP</option>
-        </select>
-      </div>
-
-      <div className="w-full">
-        <label htmlFor="scan-depth" className="block text-sm font-medium text-neutral-700">
-          Scan Depth
-        </label>
-        <select 
-          id="scan-depth" 
-          className="block w-full px-3 py-2 rounded-md border border-neutral-300 focus:ring-indigo-500 focus:border-indigo-500"
-        >
-          <option value="quick">Quick Scan</option>
-          <option value="deep">Deep Scan</option>
-        </select>
-      </div>
-    </div>
-
-    <div className="flex justify-end">
-      <button 
-        type="submit" 
-        className="ml-3 inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-      >
-        Start Scan
-      </button>
-    </div>
-  </form>
-</div>
-
-
-
-      {/* Recent Scans */}
-      <div className="bg-white rounded-lg border border-neutral-200/30 mb-8">
-        <div className="px-6 py-4 border-b border-neutral-200/30">
-          <h2 className="text-lg font-semibold text-neutral-900">Recent Scans</h2>
+                <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:opacity-50"
+                >
+                    {loading ? 'Starting Scan...' : 'Start Scan'}
+                </button>
+            </form>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-neutral-50">
-                {["Website", "Status", "Issues", "Date", "Actions"].map((heading) => (
-                  <th key={heading} className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                    {heading}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-200/30">
-              <ScanRow 
-                website="example.com" 
-                status="Complete" 
-                issues="3 Critical, 5 Warning" 
-                date="2024-01-20"
-                action="View Report"
-                statusColor="bg-green-100 text-green-800"
-              />
-              <ScanRow 
-                website="test-site.org" 
-                status="In Progress" 
-                issues="Scanning..." 
-                date="2024-01-19"
-                action="Cancel"
-                statusColor="bg-yellow-100 text-yellow-800"
-              />
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-     
-    </div>
-  );
-};
-
-const StatCard = ({ title, count, iconColor, bgColor, svgPath } : any) => (
-  <div className="bg-white p-6 rounded-lg border border-neutral-200/30">
-    <div className="flex items-center">
-      <div className={`rounded-full p-3 ${bgColor}`}>
-        <svg className={`w-6 h-6 ${iconColor}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={svgPath} />
-        </svg>
-      </div>
-      <div className="ml-4">
-        <p className="text-sm text-neutral-600">{title}</p>
-        <h3 className="text-xl font-bold text-neutral-900">{count}</h3>
-      </div>
-    </div>
-  </div>
-);
-
-const ScanRow = ({ website, status, issues, date, action, statusColor }: any) => (
-  <tr>
-    <td className="px-6 py-4 whitespace-nowrap">{website}</td>
-    <td className="px-6 py-4 whitespace-nowrap">
-      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusColor}`}>
-        {status}
-      </span>
-    </td>
-    <td className="px-6 py-4 whitespace-nowrap">{issues}</td>
-    <td className="px-6 py-4 whitespace-nowrap">{date}</td>
-    <td className="px-6 py-4 whitespace-nowrap">
-      <button className="text-indigo-600 hover:text-indigo-900">{action}</button>
-    </td>
-  </tr>
-);
-
-export default Dashboard;
+    );
+}
